@@ -19,7 +19,9 @@ namespace azm::backend
         vk::raii::Instance                    _instance = VK_NULL_HANDLE;
         vk::raii::DebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 
-        PhysicalDevice                        _device;
+        VkPhysicalDevice                      _physDevice;
+        vk::raii::Device                      _device   = VK_NULL_HANDLE;
+
 
     public: 
         VkCore();

@@ -2,12 +2,13 @@ cmake_minimum_required(VERSION 3.24)
 
 project(VulkanEngine)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.4 REQUIRED)
 find_package(glm REQUIRED)
+find_package(spdlog REQUIRED)
 
 find_program(SLANGC_EXECUTABLE
 	NAMES slangc
@@ -68,4 +69,5 @@ target_link_libraries(VulkanEngine
 	Vulkan::Vulkan
 	glfw
 	glm::glm
+	spdlog::spdlog
 )
