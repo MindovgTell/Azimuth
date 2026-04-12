@@ -1,4 +1,4 @@
-#include "Log.hpp"
+#include "log.hpp"
 
 #include <memory>
 #include <unordered_map>
@@ -62,7 +62,8 @@ public:
 
         if (verbosity == LogVerbosity::Fatal)
         {
-            PLATFORM_BREAK();
+            // TODO : Change for smth better
+            exit(1);
         }
     }
 

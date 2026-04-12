@@ -4,15 +4,19 @@
 #include <GLFW/glfw3.h>
 
 #include "window/IWindow.hpp"
+#include "event/Event.hpp"
+#include "event/IntupEvent.hpp"
 
 namespace azm
 {
     class GLFWWindow final : public IWindow
     {
     private:
-        GLFWWindow* _window = nullptr;
+        const WindowId _id;
+        GLFWwindow* _window = nullptr;
+        Event<const InputEvent&> _windowEvent;
     public:
-        GLFWWindow(const WindowSettings& settings);
+        GLFWWindow(WindowId id, const WindowSettings& settings);
         ~GLFWWindow() override;
 
         void setTitle(const std::string& title) override;
