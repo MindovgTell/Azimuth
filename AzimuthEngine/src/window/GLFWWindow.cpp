@@ -9,6 +9,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogGLFWWindow);
 GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 {
     // window initialization
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     _window = glfwCreateWindow(settings.width, settings.height, settings.title.c_str(), nullptr, nullptr);
     if (!_window)
     {
@@ -115,4 +116,9 @@ bool GLFWWindow::shouldClose() const
 {
     if (!_window) return true;
     return glfwWindowShouldClose(_window);
+}
+
+void* GLFWWindow::getNativeHandle() const
+{
+    return _window;
 }

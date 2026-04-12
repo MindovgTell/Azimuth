@@ -6,14 +6,14 @@
 
 namespace azm
 {
-    class AzmApplicaton
+    class Applicaton
     {
     private: 
         azm::backend::VkCore _core;
 
     public:
-        AzmApplicaton();
-        ~AzmApplicaton();
+        Applicaton();
+        ~Applicaton();
 
         void init(const char* pAppName, IWindow* window);
 

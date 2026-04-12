@@ -5,15 +5,16 @@
 
 #include <GLFW/glfw3.h>
 
+#include "AzmVkLogicalDevice.hpp"
+#include "AzmVkPhysDevice.hpp"
+#include "AzmVkSwapChain.hpp"
+
 #include <stdexcept>
 #include <iostream>
+#include <vector>
 
 namespace azm::backend
 {
-
-    class VulkanPhysicalDevice;
-    class VulkanLogicalDevice;
-    class VulkanSwapChain;
 
     class VkCore 
     {
@@ -62,6 +63,24 @@ namespace azm::backend
         void createGraphicsPipeline();
 
         vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const;
+
+        // Command buffer
+        void createCommandBuffer();
+        void createCommandPool();
+        void recordCommandBuffer(uint32_t imageIndex);
         
+        void transition_image_layout(
+            uint32_t                imageIndex,
+            vk::ImageLayout         old_layout,
+            vk::ImageLayout         new_layout,
+            vk::AccessFlags2        src_access_mask,
+            vk::AccessFlags2        dst_access_mask,
+            vk::PipelineStageFlags2 src_stage_mask,
+            vk::PipelineStageFlags2 dst_stage_mask);
+
+        void drawFrame();
+
+        // Synchronization
+        void createSyncObjects();
     };    
 } // namespace azm

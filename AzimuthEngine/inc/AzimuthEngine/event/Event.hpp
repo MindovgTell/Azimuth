@@ -14,7 +14,7 @@ class Event
 public: 
     void invoke(Args... args)
     {
-        AZM_LOG(LogEvent, Display, "Dispatch event");
+        // AZM_LOG(LogEvent, Display, "Dispatch event");
     }
 };
     

@@ -36,6 +36,7 @@ namespace azm
         virtual void setTitle(const std::string &title) = 0;
         virtual bool isValid() const = 0;
         virtual bool shouldClose() const = 0;
+        virtual void* getNativeHandle() const = 0;
     };
 }   // namespace azm
 

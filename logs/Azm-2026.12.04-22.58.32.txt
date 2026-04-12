@@ -1,0 +1,5 @@
+[00:58:32.177] [info] [LogGLFWWindowManager] GLFW initialized successfully!
+[00:58:32.205] [info] [LogGLFWWindowManager] Added window with id: 1
+[00:58:35.659] [info] [LogGLFWWindow] Window with id=1 closed
+[00:58:35.659] [info] [LogGLFWWindowManager] Remove closed window with id: 1
+[00:58:35.674] [info] [LogGLFWWindowManager] GLFW shutdown complete!

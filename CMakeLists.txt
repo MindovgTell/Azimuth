@@ -56,6 +56,14 @@ endfunction()
 
 add_executable(VulkanEngine
 	AzimuthEngine/src/main.cpp
+	AzimuthEngine/src/Application.cpp
+	AzimuthEngine/src/log/log.cpp
+	AzimuthEngine/src/window/GLFWWindow.cpp
+	AzimuthEngine/src/window/GLFWWindowManager.cpp
+	AzimuthEngine/src/backend/Vulkan/VkCore.cpp
+	AzimuthEngine/src/backend/Vulkan/VkLogicalDevice.cpp
+	AzimuthEngine/src/backend/Vulkan/VkPhysicalDevice.cpp
+	AzimuthEngine/src/backend/Vulkan/VkSwapChain.cpp
 )
 
 add_slang_shader_target(VulkanEngine
@@ -63,6 +71,16 @@ add_slang_shader_target(VulkanEngine
 )
 
 add_dependencies(VulkanEngine VulkanEngine_shaders)
+
+target_include_directories(VulkanEngine
+	PRIVATE
+	AzimuthEngine/inc/AzimuthEngine
+	AzimuthEngine/inc/AzimuthEngine/log
+	AzimuthEngine/inc/AzimuthEngine/window
+	AzimuthEngine/inc/AzimuthEngine/event
+	AzimuthEngine/inc/AzimuthEngine/core
+	AzimuthEngine/inc/AzimuthEngine/backend/Vulkan
+)
 
 target_link_libraries(VulkanEngine
 	PRIVATE

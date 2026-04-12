@@ -159,7 +159,7 @@ constexpr bool enableValidationLayers = true;
 
 		for (auto &image : _swapChain.images()) {
 			imageViewCreateInfo.image = image;
-			_swapChainImageViews.emplace_back(_logicalDevice, imageViewCreateInfo);
+			_swapChainImageViews.emplace_back(_logicalDevice.handle(), imageViewCreateInfo);
 		}
 	}
 
@@ -264,27 +264,27 @@ constexpr bool enableValidationLayers = true;
 		_graphicsPipeline = vk::raii::Pipeline(_logicalDevice.handle(), nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
 	}
 
-	void createCommandBuffer() {
+	void VkCore::createCommandBuffer() {
 		vk::CommandBufferAllocateInfo allocInfo{ 
-			.commandPool = commandPool, 
+			.commandPool = _commandPool, 
 			.level = vk::CommandBufferLevel::ePrimary, 
 			.commandBufferCount = 1 
 		};
 
-		commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+		_commandBuffer = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo).front());
 	}
 
-	void createCommandPool() {
+	void VkCore::createCommandPool() {
 		vk::CommandPoolCreateInfo poolInfo{
 			.flags            = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		    .queueFamilyIndex = queueIndex
+		    .queueFamilyIndex = _physicalDevice.queues().idx
 		};
-		commandPool = vk::raii::CommandPool(device, poolInfo);
+		_commandPool = vk::raii::CommandPool(_logicalDevice.handle(), poolInfo);
 	}
 
-	void recordCommandBuffer(uint32_t imageIndex)
+	void VkCore::recordCommandBuffer(uint32_t imageIndex)
 	{
-		commandBuffer.begin({});
+		_commandBuffer.begin({});
 
 		// Before starting rendering, transition the swapchain image to vk::ImageLayout::eColorAttachmentOptimal
 		transition_image_layout(
@@ -298,23 +298,23 @@ constexpr bool enableValidationLayers = true;
 		);
 		vk::ClearValue              clearColor     = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
 		vk::RenderingAttachmentInfo attachmentInfo = {
-		    .imageView   = swapChainImageViews[imageIndex],
+		    .imageView   = _swapChainImageViews[imageIndex],
 		    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 		    .loadOp      = vk::AttachmentLoadOp::eClear,
 		    .storeOp     = vk::AttachmentStoreOp::eStore,
 		    .clearValue  = clearColor};
 		vk::RenderingInfo renderingInfo = {
-		    .renderArea           = {.offset = {0, 0}, .extent = swapChainExtent},
+		    .renderArea           = {.offset = {0, 0}, .extent = _swapChain.extent()},
 		    .layerCount           = 1,
 		    .colorAttachmentCount = 1,
 		    .pColorAttachments    = &attachmentInfo};
 
-		commandBuffer.beginRendering(renderingInfo);
-		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-		commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
-		commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
-		commandBuffer.draw(3, 1, 0, 0);
-		commandBuffer.endRendering();
+		_commandBuffer.beginRendering(renderingInfo);
+		_commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *_graphicsPipeline);
+		_commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(_swapChain.extent().width), static_cast<float>(_swapChain.extent().height), 0.0f, 1.0f));
+		_commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
+		_commandBuffer.draw(3, 1, 0, 0);
+		_commandBuffer.endRendering();
 
 		// After rendering, transition the swapchain image to vk::ImageLayout::ePresentSrcKHR
 		transition_image_layout(
@@ -326,10 +326,10 @@ constexpr bool enableValidationLayers = true;
 		    vk::PipelineStageFlagBits2::eColorAttachmentOutput,        // srcStage
 		    vk::PipelineStageFlagBits2::eBottomOfPipe                  // dstStage
 		);
-		commandBuffer.end();
+		_commandBuffer.end();
 	}
 
-	void transition_image_layout(
+	void VkCore::transition_image_layout(
 	    uint32_t                imageIndex,
 	    vk::ImageLayout         old_layout,
 	    vk::ImageLayout         new_layout,
@@ -347,7 +347,7 @@ constexpr bool enableValidationLayers = true;
 		    .newLayout           = new_layout,
 		    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		    .image               = swapChainImages[imageIndex],
+		    .image               = _swapChain.images()[imageIndex],
 		    .subresourceRange    = {
 		           .aspectMask     = vk::ImageAspectFlagBits::eColor,
 		           .baseMipLevel   = 0,
@@ -358,44 +358,43 @@ constexpr bool enableValidationLayers = true;
 		    .dependencyFlags         = {},
 		    .imageMemoryBarrierCount = 1,
 		    .pImageMemoryBarriers    = &barrier};
-		commandBuffer.pipelineBarrier2(dependency_info);
+		_commandBuffer.pipelineBarrier2(dependency_info);
 	}
 
-	void createSyncObjects()
+	void VkCore::createSyncObjects()
 	{
-		presentCompleteSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-		renderFinishedSemaphore  = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-		drawFence                = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+		_presentCompleteSemaphore = vk::raii::Semaphore(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
+		_renderFinishedSemaphore  = vk::raii::Semaphore(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
+		_drawFence                = vk::raii::Fence(_logicalDevice.handle(), {.flags = vk::FenceCreateFlagBits::eSignaled});
 	}
 
-	void drawFrame()
+	void VkCore::drawFrame()
 	{
-		auto fenceResult = device.waitForFences(*drawFence, vk::True, UINT64_MAX);
+		auto fenceResult = _logicalDevice.handle().waitForFences(*_drawFence, vk::True, UINT64_MAX);
 		if (fenceResult != vk::Result::eSuccess)
 		{
 			throw std::runtime_error("failed to wait for fence!");
 		}
-		device.resetFences(*drawFence);
+		_logicalDevice.handle().resetFences(*_drawFence);
 
-		auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, *presentCompleteSemaphore, nullptr);
+		auto [result, imageIndex] = _swapChain.handle().acquireNextImage(UINT64_MAX, *_presentCompleteSemaphore, nullptr);
 
 		recordCommandBuffer(imageIndex);
 
-		graphicsQueue.waitIdle();        // NOTE: for simplicity, wait for the queue to be idle before starting the frame
-		                         // In the next chapter you see how to use multiple frames in flight and fences to sync
+		_logicalDevice.queue().waitIdle();        // NOTE: for simplicity, wait for the queue to be idle before starting the frame
 
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 		const vk::SubmitInfo   submitInfo{.waitSemaphoreCount   = 1,
-		                                  .pWaitSemaphores      = &*presentCompleteSemaphore,
+		                                  .pWaitSemaphores      = &*_presentCompleteSemaphore,
 		                                  .pWaitDstStageMask    = &waitDestinationStageMask,
 		                                  .commandBufferCount   = 1,
-		                                  .pCommandBuffers      = &*commandBuffer,
+		                                  .pCommandBuffers      = &*_commandBuffer,
 		                                  .signalSemaphoreCount = 1,
-		                                  .pSignalSemaphores    = &*renderFinishedSemaphore};
-		graphicsQueue.submit(submitInfo, *drawFence);
+		                                  .pSignalSemaphores    = &*_renderFinishedSemaphore};
+		_logicalDevice.queue().submit(submitInfo, *_drawFence);
 
-		const vk::PresentInfoKHR presentInfoKHR{.waitSemaphoreCount = 1, .pWaitSemaphores = &*renderFinishedSemaphore, .swapchainCount = 1, .pSwapchains = &*swapChain, .pImageIndices = &imageIndex};
-		result = graphicsQueue.presentKHR(presentInfoKHR);
+		const vk::PresentInfoKHR presentInfoKHR{.waitSemaphoreCount = 1, .pWaitSemaphores = &*_renderFinishedSemaphore, .swapchainCount = 1, .pSwapchains = &*_swapChain.handle(), .pImageIndices = &imageIndex};
+		result = _logicalDevice.queue().presentKHR(presentInfoKHR);
 		switch (result)
 		{
 			case vk::Result::eSuccess:
@@ -407,7 +406,4 @@ constexpr bool enableValidationLayers = true;
 				break;        // an unexpected result is returned!
 		}
 	}
-
-
-
 }

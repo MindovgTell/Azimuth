@@ -22,5 +22,6 @@ namespace azm
         void setTitle(const std::string& title) override;
         bool isValid() const override;
         bool shouldClose() const override;
+        void* getNativeHandle() const override;
     };
 }
