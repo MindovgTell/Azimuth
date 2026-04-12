@@ -24,5 +24,7 @@ namespace azm
         _core.init(pAppName, nativeWindow);
     }
 
-    void Applicaton::renderScene() {}
+    void Applicaton::renderScene() {
+        _core.drawFrame();
+    }
 }

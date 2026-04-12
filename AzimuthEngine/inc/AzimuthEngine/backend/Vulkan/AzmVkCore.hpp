@@ -46,7 +46,8 @@ namespace azm::backend
         VkCore()  = default;
         ~VkCore() = default;
         void init(const char* pAppName, GLFWwindow* window);
-
+        void drawFrame();
+        
     private: 
         // Setup Vulkan Instance
         void createInstance(const char* pAppName);
@@ -77,8 +78,6 @@ namespace azm::backend
             vk::AccessFlags2        dst_access_mask,
             vk::PipelineStageFlags2 src_stage_mask,
             vk::PipelineStageFlags2 dst_stage_mask);
-
-        void drawFrame();
 
         // Synchronization
         void createSyncObjects();

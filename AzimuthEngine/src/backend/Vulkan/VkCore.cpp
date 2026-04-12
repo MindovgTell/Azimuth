@@ -25,13 +25,14 @@ constexpr bool enableValidationLayers = true;
         createInstance(pAppName);
         setupDebugMessenger();
 		createSurface(window);
-
         _physicalDevice.pickPhysicalDevice(_instance, _surface);
 		_logicalDevice.create(_physicalDevice);
-
         _swapChain.create(_physicalDevice, _logicalDevice, _surface, window);
-		
 		createImageViews();
+		createGraphicsPipeline();
+		createCommandPool();
+		createCommandBuffer();
+		createSyncObjects();
     }
 
     std::vector<const char*> VkCore::getRequiredInstanceExtensions() const {
