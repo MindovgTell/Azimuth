@@ -467,6 +467,13 @@ constexpr bool enableValidationLayers = true;
 
 	void VkCore::recreateSwapChain(GLFWwindow* window)
 	{
+		int width = 0, height = 0;
+		glfwGetFramebufferSize(window, &width, &height);
+		while (width == 0 || height == 0) {
+			glfwGetFramebufferSize(window, &width, &height);
+			glfwWaitEvents();
+		}
+		
 		_logicalDevice.handle().waitIdle();
 		cleanupSwapChain();
 		_swapChain.create(_physicalDevice,_logicalDevice,_surface, window);
