@@ -1,4 +1,5 @@
 #include "GLFWWindow.hpp"
+#include "core/Application.hpp"
 #include "log/log.hpp"
 #include <GLFW/glfw3.h>
 
@@ -19,12 +20,14 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
     glfwSetWindowPos(_window, settings.x, settings.y);
 
     // user pointer
-    glfwSetWindowUserPointer(_window, this);
+    _callbackContext.window = this;
+    glfwSetWindowUserPointer(_window, &_callbackContext);
 
     // events handling
     glfwSetWindowCloseCallback(_window, [](GLFWwindow* window)
         {
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
             AZM_LOG(LogGLFWWindow, Display, "Window with id={} closed", thisWindow->_id.value);
 
             InputEvent event;
@@ -36,8 +39,14 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 
     glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height)
         {
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
             AZM_LOG(LogGLFWWindow, Display, "Resize: width={}, height={}", width, height);
+
+            if (context->application != nullptr)
+            {
+                context->application->notifyFramebufferResized();
+            }
 
             InputEvent event;
             event.type = EventType::WindowResize;
@@ -48,7 +57,8 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 
     glfwSetKeyCallback(_window,[](GLFWwindow* window, int key, int scancode, int action, int mods)
         {   
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
             AZM_LOG(LogGLFWWindow, Display, "Key={}, scancode={}", key, scancode);
             
             InputEvent event;
@@ -60,7 +70,8 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 
     glfwSetCursorPosCallback(_window, [](GLFWwindow* window, double xpos, double ypos) 
         {
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
                         
             InputEvent event;
             event.type = EventType::MouseMove;
@@ -71,7 +82,8 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 
     glfwSetMouseButtonCallback(_window, [](GLFWwindow* window, int button, int action, int mods) 
         {
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
                         
             InputEvent event;
             event.type = EventType::MouseButton;
@@ -82,7 +94,8 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
 
     glfwSetScrollCallback(_window, [](GLFWwindow* window, double xoffset, double yoffset)
         {
-            auto *thisWindow = static_cast<GLFWWindow*>(glfwGetWindowUserPointer(window));
+            auto* context = static_cast<GLFWWindow::CallbackContext*>(glfwGetWindowUserPointer(window));
+            auto* thisWindow = context->window;
             
             InputEvent event;
             event.type = EventType::MouseScroll;
@@ -90,6 +103,11 @@ GLFWWindow::GLFWWindow(WindowId id, const WindowSettings& settings) : _id(id)
             thisWindow->_windowEvent.invoke(event);
         }
     );
+}
+
+void GLFWWindow::setApplication(Applicaton* application)
+{
+    _callbackContext.application = application;
 }
 
 GLFWWindow::~GLFWWindow()

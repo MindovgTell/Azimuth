@@ -6,12 +6,13 @@
 #include "AzmVkLogicalDevice.hpp"
 #include "AzmVkSwapChain.hpp"
 
-#include "core/Utility.hpp"
+#include <cassert>
 
 namespace azm::backend 
 {
 
     DEFINE_LOG_CATEGORY_STATIC(ValidationLayerLog);
+	constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
@@ -31,7 +32,7 @@ constexpr bool enableValidationLayers = true;
 		createImageViews();
 		createGraphicsPipeline();
 		createCommandPool();
-		createCommandBuffer();
+		createCommandBuffers();
 		createSyncObjects();
     }
 
@@ -265,14 +266,14 @@ constexpr bool enableValidationLayers = true;
 		_graphicsPipeline = vk::raii::Pipeline(_logicalDevice.handle(), nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
 	}
 
-	void VkCore::createCommandBuffer() {
+	void VkCore::createCommandBuffers() {
 		vk::CommandBufferAllocateInfo allocInfo{ 
 			.commandPool = _commandPool, 
 			.level = vk::CommandBufferLevel::ePrimary, 
-			.commandBufferCount = 1 
+			.commandBufferCount = MAX_FRAMES_IN_FLIGHT 
 		};
 
-		_commandBuffer = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo).front());
+		_commandBuffers = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo));
 	}
 
 	void VkCore::createCommandPool() {
@@ -285,7 +286,7 @@ constexpr bool enableValidationLayers = true;
 
 	void VkCore::recordCommandBuffer(uint32_t imageIndex)
 	{
-		_commandBuffer.begin({});
+		_commandBuffers[_frameIndex].begin({});
 
 		// Before starting rendering, transition the swapchain image to vk::ImageLayout::eColorAttachmentOptimal
 		transition_image_layout(
@@ -310,12 +311,12 @@ constexpr bool enableValidationLayers = true;
 		    .colorAttachmentCount = 1,
 		    .pColorAttachments    = &attachmentInfo};
 
-		_commandBuffer.beginRendering(renderingInfo);
-		_commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *_graphicsPipeline);
-		_commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(_swapChain.extent().width), static_cast<float>(_swapChain.extent().height), 0.0f, 1.0f));
-		_commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
-		_commandBuffer.draw(3, 1, 0, 0);
-		_commandBuffer.endRendering();
+		_commandBuffers[_frameIndex].beginRendering(renderingInfo);
+		_commandBuffers[_frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, *_graphicsPipeline);
+		_commandBuffers[_frameIndex].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(_swapChain.extent().width), static_cast<float>(_swapChain.extent().height), 0.0f, 1.0f));
+		_commandBuffers[_frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
+		_commandBuffers[_frameIndex].draw(3, 1, 0, 0);
+		_commandBuffers[_frameIndex].endRendering();
 
 		// After rendering, transition the swapchain image to vk::ImageLayout::ePresentSrcKHR
 		transition_image_layout(
@@ -327,7 +328,7 @@ constexpr bool enableValidationLayers = true;
 		    vk::PipelineStageFlagBits2::eColorAttachmentOutput,        // srcStage
 		    vk::PipelineStageFlagBits2::eBottomOfPipe                  // dstStage
 		);
-		_commandBuffer.end();
+		_commandBuffers[_frameIndex].end();
 	}
 
 	void VkCore::transition_image_layout(
@@ -359,43 +360,82 @@ constexpr bool enableValidationLayers = true;
 		    .dependencyFlags         = {},
 		    .imageMemoryBarrierCount = 1,
 		    .pImageMemoryBarriers    = &barrier};
-		_commandBuffer.pipelineBarrier2(dependency_info);
+		_commandBuffers[_frameIndex].pipelineBarrier2(dependency_info);
 	}
 
 	void VkCore::createSyncObjects()
 	{
-		_presentCompleteSemaphore = vk::raii::Semaphore(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
-		_renderFinishedSemaphore  = vk::raii::Semaphore(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
-		_drawFence                = vk::raii::Fence(_logicalDevice.handle(), {.flags = vk::FenceCreateFlagBits::eSignaled});
+		assert(_presentCompleteSemaphores.empty() && _renderFinishedSemaphores.empty() && _inFlightFences.empty());
+		
+		for (size_t i = 0; i < _swapChain.images().size(); i++)
+		{
+			_renderFinishedSemaphores.emplace_back(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
+		}
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			_presentCompleteSemaphores.emplace_back(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
+			_inFlightFences.emplace_back(_logicalDevice.handle(), vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+		}	
 	}
 
-	void VkCore::drawFrame()
+	void VkCore::drawFrame(GLFWwindow* window)
 	{
-		auto fenceResult = _logicalDevice.handle().waitForFences(*_drawFence, vk::True, UINT64_MAX);
+		auto fenceResult = _logicalDevice.handle().waitForFences(*_inFlightFences[_frameIndex], vk::True, UINT64_MAX);
 		if (fenceResult != vk::Result::eSuccess)
 		{
 			throw std::runtime_error("failed to wait for fence!");
 		}
-		_logicalDevice.handle().resetFences(*_drawFence);
+		_logicalDevice.handle().resetFences(*_inFlightFences[_frameIndex]);
 
-		auto [result, imageIndex] = _swapChain.handle().acquireNextImage(UINT64_MAX, *_presentCompleteSemaphore, nullptr);
+		auto [result, imageIndex] = _swapChain.handle().acquireNextImage(UINT64_MAX, *_presentCompleteSemaphores[_frameIndex], nullptr);
 
+		if (result == vk::Result::eErrorOutOfDateKHR)
+		{
+			recreateSwapChain(window);
+			return;
+		}
+		if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+		{
+			assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
+
+		_logicalDevice.handle().resetFences(*_inFlightFences[_frameIndex]);
+
+		_commandBuffers[_frameIndex].reset();
 		recordCommandBuffer(imageIndex);
 
 		_logicalDevice.queue().waitIdle();        // NOTE: for simplicity, wait for the queue to be idle before starting the frame
 
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 		const vk::SubmitInfo   submitInfo{.waitSemaphoreCount   = 1,
-		                                  .pWaitSemaphores      = &*_presentCompleteSemaphore,
+		                                  .pWaitSemaphores      = &*_presentCompleteSemaphores[_frameIndex],
 		                                  .pWaitDstStageMask    = &waitDestinationStageMask,
 		                                  .commandBufferCount   = 1,
-		                                  .pCommandBuffers      = &*_commandBuffer,
+		                                  .pCommandBuffers      = &*_commandBuffers[_frameIndex],
 		                                  .signalSemaphoreCount = 1,
-		                                  .pSignalSemaphores    = &*_renderFinishedSemaphore};
-		_logicalDevice.queue().submit(submitInfo, *_drawFence);
+		                                  .pSignalSemaphores    = &*_renderFinishedSemaphores[imageIndex]};
+		_logicalDevice.queue().submit(submitInfo, *_inFlightFences[_frameIndex]);
 
-		const vk::PresentInfoKHR presentInfoKHR{.waitSemaphoreCount = 1, .pWaitSemaphores = &*_renderFinishedSemaphore, .swapchainCount = 1, .pSwapchains = &*_swapChain.handle(), .pImageIndices = &imageIndex};
+		const vk::PresentInfoKHR presentInfoKHR{
+			.waitSemaphoreCount = 1, 
+			.pWaitSemaphores = &*_renderFinishedSemaphores[imageIndex], 
+			.swapchainCount = 1, 
+			.pSwapchains = &*_swapChain.handle(), 
+			.pImageIndices = &imageIndex
+		};
 		result = _logicalDevice.queue().presentKHR(presentInfoKHR);
+		if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || _framebufferResized)
+		{
+			_framebufferResized = false;
+			recreateSwapChain(window);
+		}	
+		else
+		{
+		// There are no other success codes than eSuccess; on any error code, presentKHR already threw an exception.
+			assert(result == vk::Result::eSuccess);
+		}
 		switch (result)
 		{
 			case vk::Result::eSuccess:
@@ -406,5 +446,37 @@ constexpr bool enableValidationLayers = true;
 			default:
 				break;        // an unexpected result is returned!
 		}
+
+		_frameIndex = (_frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+	}
+
+	void VkCore::waitIdle()
+	{
+		if (_logicalDevice.handle() == nullptr)
+		{
+			return;
+		}
+
+		_logicalDevice.handle().waitIdle();
+	}
+
+	void VkCore::notifyFramebufferResized()
+	{
+		_framebufferResized = true;
+	}
+
+	void VkCore::recreateSwapChain(GLFWwindow* window)
+	{
+		_logicalDevice.handle().waitIdle();
+		cleanupSwapChain();
+		_swapChain.create(_physicalDevice,_logicalDevice,_surface, window);
+		createImageViews();
+	}
+
+	// Later better to push it into VulkanSwapChain class
+	void VkCore::cleanupSwapChain()
+	{
+		_swapChainImageViews.clear();
+		_swapChain.handle() = nullptr;
 	}
 }

@@ -21,7 +21,10 @@ namespace azm::backend
 			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
 			{},
 			{.shaderDrawParameters = true},
-			{.dynamicRendering = true},
+			{
+				.dynamicRendering = true,
+				.synchronization2 = true
+			},
 			{.extendedDynamicState = true}
 		};
 

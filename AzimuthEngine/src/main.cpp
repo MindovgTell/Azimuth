@@ -28,13 +28,8 @@ int main()
     }
 
     azm::Applicaton app;
-    app.init("Azimuth", window.get());
-
-    while (!windowManager.areAllWindowsClosed())
-    {
-        windowManager.update();
-        app.renderScene();
-    }
+    app.init("Azimuth", window);
+    app.run(windowManager);
 
     return EXIT_SUCCESS;
 }

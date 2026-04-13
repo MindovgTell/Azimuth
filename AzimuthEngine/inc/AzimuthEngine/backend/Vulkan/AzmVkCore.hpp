@@ -36,18 +36,22 @@ namespace azm::backend
         vk::raii::Pipeline 		 _graphicsPipeline = nullptr;
         // Command buffers
         vk::raii::CommandPool    _commandPool 	   = nullptr;
-        vk::raii::CommandBuffer  _commandBuffer    = nullptr;
+        std::vector<vk::raii::CommandBuffer>  _commandBuffers;
         // Synchronization primitieves
-        vk::raii::Semaphore 	 _presentCompleteSemaphore = nullptr;
-        vk::raii::Semaphore 	 _renderFinishedSemaphore  = nullptr;
-        vk::raii::Fence 		 _drawFence 				  = nullptr;
+        std::vector<vk::raii::Semaphore> 	 _presentCompleteSemaphores;
+        std::vector<vk::raii::Semaphore> 	 _renderFinishedSemaphores;
+        std::vector<vk::raii::Fence> 		 _inFlightFences;
+        uint32_t                             _frameIndex = 0;
+        bool _framebufferResized = false;
 
     public: 
         VkCore()  = default;
         ~VkCore() = default;
         void init(const char* pAppName, GLFWwindow* window);
-        void drawFrame();
-        
+        void drawFrame(GLFWwindow* window);
+        void notifyFramebufferResized();
+        void waitIdle();
+
     private: 
         // Setup Vulkan Instance
         void createInstance(const char* pAppName);
@@ -66,7 +70,7 @@ namespace azm::backend
         vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const;
 
         // Command buffer
-        void createCommandBuffer();
+        void createCommandBuffers();
         void createCommandPool();
         void recordCommandBuffer(uint32_t imageIndex);
         
@@ -81,5 +85,8 @@ namespace azm::backend
 
         // Synchronization
         void createSyncObjects();
+
+        void recreateSwapChain(GLFWwindow* window);
+        void cleanupSwapChain();
     };    
 } // namespace azm

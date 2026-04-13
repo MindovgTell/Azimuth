@@ -22,7 +22,8 @@ namespace azm::backend
                     vk::raii::SurfaceKHR const& surface,
                     GLFWwindow* window);
 
-        vk::raii::SwapchainKHR const& handle() const
+        // In future better to return const
+        vk::raii::SwapchainKHR& handle()
         {
             return _swapChain;
         }
