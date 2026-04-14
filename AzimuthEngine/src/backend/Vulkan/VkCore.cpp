@@ -7,6 +7,9 @@
 #include "AzmVkSwapChain.hpp"
 
 #include <cassert>
+#include <array>
+
+#include <glm/glm.hpp>
 
 namespace azm::backend 
 {
@@ -20,6 +23,29 @@ constexpr bool enableValidationLayers = false;
 constexpr bool enableValidationLayers = true;
 #endif
 
+	//Temporary solution to put vertecies logic in VkCore
+	struct Vertex
+	{
+		glm::vec2 pos;
+		glm::vec3 color;
+
+		static vk::VertexInputBindingDescription getBindingDescription()
+		{
+			return {.binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex};
+		}
+
+		static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions()
+		{
+			return {{{.location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = offsetof(Vertex, pos)},
+               {.location = 1, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = offsetof(Vertex, color)}}};
+		}
+	};
+
+	const std::vector<Vertex> vertices = {
+		{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+		{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+		{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	};
 
     void VkCore::init(const char* pAppName, GLFWwindow* window) 
     {
@@ -32,6 +58,7 @@ constexpr bool enableValidationLayers = true;
 		createImageViews();
 		createGraphicsPipeline();
 		createCommandPool();
+		createVertexBuffer();
 		createCommandBuffers();
 		createSyncObjects();
     }
@@ -192,7 +219,12 @@ constexpr bool enableValidationLayers = true;
 
 		vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 			
-		vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+		auto                                     bindingDescription    = Vertex::getBindingDescription();
+		auto                                     attributeDescriptions = Vertex::getAttributeDescriptions();
+		vk::PipelineVertexInputStateCreateInfo   vertexInputInfo{.vertexBindingDescriptionCount   = 1,
+																.pVertexBindingDescriptions      = &bindingDescription,
+																.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+																.pVertexAttributeDescriptions    = attributeDescriptions.data()};
 		
 		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
 			.topology = vk::PrimitiveTopology::eTriangleList
@@ -274,6 +306,16 @@ constexpr bool enableValidationLayers = true;
 		};
 
 		_commandBuffers = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo));
+	}
+
+	void VkCore::createVertexBuffer()
+	{
+		vk::BufferCreateInfo bufferInfo{
+			.size        = sizeof(vertices[0]) * vertices.size(),
+            .usage       = vk::BufferUsageFlagBits::eVertexBuffer,
+        	.sharingMode = vk::SharingMode::eExclusive
+		};
+		
 	}
 
 	void VkCore::createCommandPool() {
@@ -473,7 +515,7 @@ constexpr bool enableValidationLayers = true;
 			glfwGetFramebufferSize(window, &width, &height);
 			glfwWaitEvents();
 		}
-		
+
 		_logicalDevice.handle().waitIdle();
 		cleanupSwapChain();
 		_swapChain.create(_physicalDevice,_logicalDevice,_surface, window);
