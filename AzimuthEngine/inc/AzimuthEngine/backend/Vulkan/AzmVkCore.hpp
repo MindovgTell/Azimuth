@@ -73,6 +73,7 @@ namespace azm::backend
         void createCommandBuffers();
         void createCommandPool();
         void recordCommandBuffer(uint32_t imageIndex);
+        void createVertexBuffer();
         
         void transition_image_layout(
             uint32_t                imageIndex,
