@@ -43,6 +43,9 @@ namespace azm::backend
         std::vector<vk::raii::Fence> 		 _inFlightFences;
         uint32_t                             _frameIndex = 0;
         bool _framebufferResized = false;
+        // Vertex buffer
+        vk::raii::Buffer        _vertexBuffer       = nullptr;
+        vk::raii::DeviceMemory  _vertexBufferMemory = nullptr;
 
     public: 
         VkCore()  = default;
@@ -89,5 +92,8 @@ namespace azm::backend
 
         void recreateSwapChain(GLFWwindow* window);
         void cleanupSwapChain();
+
+        // Vertex buffer
+        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
     };    
 } // namespace azm

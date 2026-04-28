@@ -308,6 +308,20 @@ constexpr bool enableValidationLayers = true;
 		_commandBuffers = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo));
 	}
 
+	uint32_t VkCore::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+	{
+		vk::PhysicalDeviceMemoryProperties memProperties = _physicalDevice.handle().getMemoryProperties();
+		for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+		{
+			if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+			{
+				return i;
+			}
+		}
+
+		throw std::runtime_error("failed to find suitable memory type!");
+	}
+
 	void VkCore::createVertexBuffer()
 	{
 		vk::BufferCreateInfo bufferInfo{
@@ -315,7 +329,23 @@ constexpr bool enableValidationLayers = true;
             .usage       = vk::BufferUsageFlagBits::eVertexBuffer,
         	.sharingMode = vk::SharingMode::eExclusive
 		};
+
+		_vertexBuffer = vk::raii::Buffer(_logicalDevice.handle(), bufferInfo);
 		
+		// Allocate buffer memory
+		vk::MemoryRequirements memRequirements = _vertexBuffer.getMemoryRequirements();
+	
+		vk::MemoryAllocateInfo memoryAllocateInfo{
+			.allocationSize = memRequirements.size,
+			.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
+		};
+
+		_vertexBufferMemory = vk::raii::DeviceMemory(_logicalDevice.handle(), memoryAllocateInfo);
+		_vertexBuffer.bindMemory(*_vertexBufferMemory,0);
+
+		void* data = _vertexBufferMemory.mapMemory(0, bufferInfo.size);
+		memcpy(data, vertices.data(), bufferInfo.size);
+		_vertexBufferMemory.unmapMemory();
 	}
 
 	void VkCore::createCommandPool() {
@@ -357,7 +387,8 @@ constexpr bool enableValidationLayers = true;
 		_commandBuffers[_frameIndex].bindPipeline(vk::PipelineBindPoint::eGraphics, *_graphicsPipeline);
 		_commandBuffers[_frameIndex].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(_swapChain.extent().width), static_cast<float>(_swapChain.extent().height), 0.0f, 1.0f));
 		_commandBuffers[_frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
-		_commandBuffers[_frameIndex].draw(3, 1, 0, 0);
+		_commandBuffers[_frameIndex].bindVertexBuffers(0, *_vertexBuffer, {0});
+		_commandBuffers[_frameIndex].draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 		_commandBuffers[_frameIndex].endRendering();
 
 		// After rendering, transition the swapchain image to vk::ImageLayout::ePresentSrcKHR
