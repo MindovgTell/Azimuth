@@ -50,6 +50,14 @@ namespace azm::backend
         vk::raii::Buffer        _indexBuffer        = nullptr;
         vk::raii::DeviceMemory  _indexBufferMemory  = nullptr;        
 
+        std::vector<vk::raii::Buffer> _uniformBuffers;
+        std::vector<vk::raii::DeviceMemory> _uniformBuffersMemory;
+        std::vector<void*> _uniformBuffersMapped;
+
+        vk::raii::DescriptorSetLayout   _descriptorSetLayout = nullptr;
+        vk::raii::DescriptorPool        _descriptorPool      = nullptr;
+        std::vector<vk::raii::DescriptorSet> _descriptorSets;
+
     public: 
         VkCore()  = default;
         ~VkCore() = default;
@@ -71,6 +79,8 @@ namespace azm::backend
 
         void createImageViews();
 
+        void createDescriptorSetLayout();
+
         void createGraphicsPipeline();
 
         vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const;
@@ -81,6 +91,9 @@ namespace azm::backend
         void recordCommandBuffer(uint32_t imageIndex);
         void createVertexBuffer();
         void createIndexBuffer();
+        void createUniformBuffers();
+        void createDescriptorPool();
+        void createDescriptorSets();
         
         void transition_image_layout(
             uint32_t                imageIndex,
@@ -101,5 +114,7 @@ namespace azm::backend
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
         void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::raii::Buffer& buffer, vk::raii::DeviceMemory& bufferMemory);
         void copyBuffer(vk::raii::Buffer & srcBuffer, vk::raii::Buffer & dstBuffer, vk::DeviceSize size);
+    
+        void updateUniformBuffer(uint32_t currentImage);
     };    
 } // namespace azm

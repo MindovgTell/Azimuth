@@ -10,6 +10,9 @@
 #include <array>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <chrono>
 
 namespace azm::backend 
 {
@@ -42,14 +45,22 @@ constexpr bool enableValidationLayers = true;
 	};
 
 	const std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-		{{0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
-		{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-		{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+		{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+		{{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+		{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+		{{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}
 	};
 
 	const std::vector<uint16_t> indices = {
 		0, 1, 2, 2, 3, 0
+	};
+
+	// Transformations
+
+	struct UniformBufferObject {
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
 	};
 
     void VkCore::init(const char* pAppName, GLFWwindow* window) 
@@ -61,10 +72,14 @@ constexpr bool enableValidationLayers = true;
 		_logicalDevice.create(_physicalDevice);
         _swapChain.create(_physicalDevice, _logicalDevice, _surface, window);
 		createImageViews();
+		createDescriptorSetLayout();
 		createGraphicsPipeline();
 		createCommandPool();
 		createVertexBuffer();
 		createIndexBuffer();
+		createUniformBuffers();
+		createDescriptorPool();
+		createDescriptorSets();
 		createCommandBuffers();
 		createSyncObjects();
     }
@@ -207,6 +222,75 @@ constexpr bool enableValidationLayers = true;
 		return shaderModule;
 	}
 
+	void VkCore::createUniformBuffers(){
+		_uniformBuffers.clear();
+		_uniformBuffersMemory.clear();
+		_uniformBuffersMapped.clear();
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+			vk::raii::Buffer buffer({});
+			vk::raii::DeviceMemory bufferMem({});
+			createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, buffer, bufferMem);
+			_uniformBuffers.emplace_back(std::move(buffer));
+			_uniformBuffersMemory.emplace_back(std::move(bufferMem));
+			_uniformBuffersMapped.emplace_back( _uniformBuffersMemory[i].mapMemory(0, bufferSize));
+		}
+	}
+
+	void VkCore::createDescriptorSets() {
+		std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *_descriptorSetLayout);
+		vk::DescriptorSetAllocateInfo allocInfo {
+			.descriptorPool = _descriptorPool, 
+			.descriptorSetCount = static_cast<uint32_t>(layouts.size()), 
+			.pSetLayouts = layouts.data()
+		};
+
+		_descriptorSets.clear();
+		_descriptorSets = _logicalDevice.handle().allocateDescriptorSets(allocInfo);
+		
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			vk::DescriptorBufferInfo bufferInfo{ 
+				.buffer = _uniformBuffers[i], 
+				.offset = 0, 
+				.range = sizeof(UniformBufferObject)
+			};
+
+			vk::WriteDescriptorSet descriptorWrite{ 
+				.dstSet = _descriptorSets[i], 
+				.dstBinding = 0,
+				.dstArrayElement = 0, 
+				.descriptorCount = 1, 
+				.descriptorType = vk::DescriptorType::eUniformBuffer, 
+				.pBufferInfo = &bufferInfo 
+			};
+
+			_logicalDevice.handle().updateDescriptorSets(descriptorWrite, {});
+		}
+	
+	}
+
+	void VkCore::createDescriptorPool() {
+		vk::DescriptorPoolSize poolSize(vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT);
+		vk::DescriptorPoolCreateInfo poolInfo{ 
+			.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 
+			.maxSets = MAX_FRAMES_IN_FLIGHT, 
+			.poolSizeCount = 1, 
+			.pPoolSizes = &poolSize
+		};
+
+		_descriptorPool = vk::raii::DescriptorPool(_logicalDevice.handle(), poolInfo);
+	}
+
+	void VkCore::createDescriptorSetLayout() {
+		vk::DescriptorSetLayoutBinding uboLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
+		vk::DescriptorSetLayoutCreateInfo layoutInfo{
+			.bindingCount = 1, 
+			.pBindings = &uboLayoutBinding
+		};
+		_descriptorSetLayout = vk::raii::DescriptorSetLayout(_logicalDevice.handle(), layoutInfo);
+	}
+
 	void VkCore::createGraphicsPipeline()
 	{
 		vk::raii::ShaderModule shaderModule = createShaderModule(readFile("build/shaders/VulkanEngine.spv"));
@@ -249,10 +333,13 @@ constexpr bool enableValidationLayers = true;
 		vk::PipelineRasterizationStateCreateInfo rasterizer{
 			.depthClampEnable        = vk::False,
 			.rasterizerDiscardEnable = vk::False,
-            .polygonMode             = vk::PolygonMode::eFill,
+			.polygonMode             = vk::PolygonMode::eFill,
 			.cullMode                = vk::CullModeFlagBits::eBack,
-			.frontFace               = vk::FrontFace::eClockwise,
+			.frontFace               = vk::FrontFace::eCounterClockwise,
 			.depthBiasEnable         = vk::False,
+			.depthBiasConstantFactor = 0.0f,
+			.depthBiasClamp          = 0.0f,
+			.depthBiasSlopeFactor    = 0.0f,
 			.lineWidth               = 1.0f
 		};
 
@@ -280,10 +367,16 @@ constexpr bool enableValidationLayers = true;
 		};
 
 
-		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-			.setLayoutCount = 0, 
-			.pushConstantRangeCount = 0
+		// vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+		// 	.setLayoutCount = 0, 
+		// 	.pushConstantRangeCount = 0
+		// };
+		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{ 
+			.setLayoutCount = 1, 
+			.pSetLayouts = &*_descriptorSetLayout, 
+			.pushConstantRangeCount = 0 
 		};
+
 		_pipelineLayout = vk::raii::PipelineLayout(_logicalDevice.handle(), pipelineLayoutInfo);
 
 		vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
@@ -456,6 +549,7 @@ constexpr bool enableValidationLayers = true;
 		_commandBuffers[_frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
 		_commandBuffers[_frameIndex].bindVertexBuffers(0, *_vertexBuffer, {0});
 		_commandBuffers[_frameIndex].bindIndexBuffer(*_indexBuffer, 0, vk::IndexType::eUint16);
+		_commandBuffers[_frameIndex].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, _pipelineLayout, 0, *_descriptorSets[_frameIndex], nullptr);
 		_commandBuffers[_frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
 		_commandBuffers[_frameIndex].endRendering();
 
@@ -549,14 +643,19 @@ constexpr bool enableValidationLayers = true;
 
 		_logicalDevice.queue().waitIdle();        // NOTE: for simplicity, wait for the queue to be idle before starting the frame
 
+
+		updateUniformBuffer(_frameIndex);
+
 		vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-		const vk::SubmitInfo   submitInfo{.waitSemaphoreCount   = 1,
-		                                  .pWaitSemaphores      = &*_presentCompleteSemaphores[_frameIndex],
-		                                  .pWaitDstStageMask    = &waitDestinationStageMask,
-		                                  .commandBufferCount   = 1,
-		                                  .pCommandBuffers      = &*_commandBuffers[_frameIndex],
-		                                  .signalSemaphoreCount = 1,
-		                                  .pSignalSemaphores    = &*_renderFinishedSemaphores[imageIndex]};
+		const vk::SubmitInfo   submitInfo{
+			.waitSemaphoreCount   = 1,
+		    .pWaitSemaphores      = &*_presentCompleteSemaphores[_frameIndex],
+			.pWaitDstStageMask    = &waitDestinationStageMask,
+			.commandBufferCount   = 1,
+			.pCommandBuffers      = &*_commandBuffers[_frameIndex],
+			.signalSemaphoreCount = 1,
+			.pSignalSemaphores    = &*_renderFinishedSemaphores[imageIndex]
+		};
 		_logicalDevice.queue().submit(submitInfo, *_inFlightFences[_frameIndex]);
 
 		const vk::PresentInfoKHR presentInfoKHR{
@@ -589,6 +688,19 @@ constexpr bool enableValidationLayers = true;
 		}
 
 		_frameIndex = (_frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+	}
+
+	void VkCore::updateUniformBuffer(uint32_t currentImage) {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+		UniformBufferObject ubo{};
+		ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.proj = glm::perspective(glm::radians(45.0f), static_cast<float>(_swapChain.extent().width) / static_cast<float>(_swapChain.extent().height), 0.1f, 10.0f);
+		ubo.proj[1][1] *= -1;
+		memcpy(_uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 	}
 
 	void VkCore::waitIdle()
