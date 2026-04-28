@@ -67,7 +67,7 @@ add_executable(VulkanEngine
 )
 
 add_slang_shader_target(VulkanEngine
-	SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AzimuthEngine/shaders/shader.slang
+	SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/AzimuthEngine/assets/shaders/shader.slang
 )
 
 add_dependencies(VulkanEngine VulkanEngine_shaders)

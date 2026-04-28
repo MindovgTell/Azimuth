@@ -46,6 +46,9 @@ namespace azm::backend
         // Vertex buffer
         vk::raii::Buffer        _vertexBuffer       = nullptr;
         vk::raii::DeviceMemory  _vertexBufferMemory = nullptr;
+        // Index buffer
+        vk::raii::Buffer        _indexBuffer        = nullptr;
+        vk::raii::DeviceMemory  _indexBufferMemory  = nullptr;        
 
     public: 
         VkCore()  = default;
@@ -77,6 +80,7 @@ namespace azm::backend
         void createCommandPool();
         void recordCommandBuffer(uint32_t imageIndex);
         void createVertexBuffer();
+        void createIndexBuffer();
         
         void transition_image_layout(
             uint32_t                imageIndex,
@@ -95,5 +99,7 @@ namespace azm::backend
 
         // Vertex buffer
         uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+        void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::raii::Buffer& buffer, vk::raii::DeviceMemory& bufferMemory);
+        void copyBuffer(vk::raii::Buffer & srcBuffer, vk::raii::Buffer & dstBuffer, vk::DeviceSize size);
     };    
 } // namespace azm

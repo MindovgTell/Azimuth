@@ -42,9 +42,14 @@ constexpr bool enableValidationLayers = true;
 	};
 
 	const std::vector<Vertex> vertices = {
-		{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-		{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+		{{-0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+		{{0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+		{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
 		{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	};
+
+	const std::vector<uint16_t> indices = {
+		0, 1, 2, 2, 3, 0
 	};
 
     void VkCore::init(const char* pAppName, GLFWwindow* window) 
@@ -59,6 +64,7 @@ constexpr bool enableValidationLayers = true;
 		createGraphicsPipeline();
 		createCommandPool();
 		createVertexBuffer();
+		createIndexBuffer();
 		createCommandBuffers();
 		createSyncObjects();
     }
@@ -322,30 +328,91 @@ constexpr bool enableValidationLayers = true;
 		throw std::runtime_error("failed to find suitable memory type!");
 	}
 
+	void VkCore::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::raii::Buffer& buffer, vk::raii::DeviceMemory& bufferMemory) {
+		vk::BufferCreateInfo bufferInfo{ .size = size, .usage = usage, .sharingMode = vk::SharingMode::eExclusive };
+		buffer = vk::raii::Buffer(_logicalDevice.handle(), bufferInfo);
+		vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+		vk::MemoryAllocateInfo allocInfo{ .allocationSize = memRequirements.size, .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties) };
+		bufferMemory = vk::raii::DeviceMemory(_logicalDevice.handle(), allocInfo);
+		buffer.bindMemory(*bufferMemory, 0);
+	}
+
+	void VkCore::copyBuffer(vk::raii::Buffer& srcBuffer, vk::raii::Buffer& dstBuffer, vk::DeviceSize size) {
+		vk::CommandBufferAllocateInfo allocInfo{ 
+			.commandPool = _commandPool, 
+			.level = vk::CommandBufferLevel::ePrimary, 
+			.commandBufferCount = 1 
+		};
+    	vk::raii::CommandBuffer commandCopyBuffer = std::move(_logicalDevice.handle().allocateCommandBuffers(allocInfo).front());
+		commandCopyBuffer.begin(vk::CommandBufferBeginInfo { 
+			.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit 
+		});
+		commandCopyBuffer.copyBuffer(srcBuffer, dstBuffer, vk::BufferCopy(0, 0, size));
+		commandCopyBuffer.end();
+
+		_logicalDevice.queue().submit(
+			vk::SubmitInfo{ 
+				.commandBufferCount = 1, 
+				.pCommandBuffers = &*commandCopyBuffer 
+			}, 
+			nullptr);
+		_logicalDevice.queue().waitIdle();
+	}
+
 	void VkCore::createVertexBuffer()
 	{
-		vk::BufferCreateInfo bufferInfo{
-			.size        = sizeof(vertices[0]) * vertices.size(),
-            .usage       = vk::BufferUsageFlagBits::eVertexBuffer,
-        	.sharingMode = vk::SharingMode::eExclusive
-		};
+		vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
+		vk::BufferCreateInfo stagingInfo {
+			.size = bufferSize,
+			.usage = vk::BufferUsageFlagBits::eTransferSrc, 
+			.sharingMode = vk::SharingMode::eExclusive 
+		};
+		vk::raii::Buffer stagingBuffer(_logicalDevice.handle(), stagingInfo);
+		vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
+    	vk::MemoryAllocateInfo memoryAllocateInfoStaging{  
+			.allocationSize = memRequirementsStaging.size, 
+			.memoryTypeIndex = findMemoryType(memRequirementsStaging.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent) 
+		};
+    	vk::raii::DeviceMemory stagingBufferMemory(_logicalDevice.handle(), memoryAllocateInfoStaging);
+
+   	 	stagingBuffer.bindMemory(stagingBufferMemory, 0);
+		void* dataStaging = stagingBufferMemory.mapMemory(0, stagingInfo.size);
+		memcpy(dataStaging, vertices.data(), stagingInfo.size);
+		stagingBufferMemory.unmapMemory();
+
+		vk::BufferCreateInfo bufferInfo{ 
+			.size = bufferSize,  
+			.usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, 
+			.sharingMode = vk::SharingMode::eExclusive 
+		};
 		_vertexBuffer = vk::raii::Buffer(_logicalDevice.handle(), bufferInfo);
-		
-		// Allocate buffer memory
+
 		vk::MemoryRequirements memRequirements = _vertexBuffer.getMemoryRequirements();
-	
-		vk::MemoryAllocateInfo memoryAllocateInfo{
-			.allocationSize = memRequirements.size,
-			.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)
-		};
+		vk::MemoryAllocateInfo memoryAllocateInfo{  
+			.allocationSize = memRequirements.size, 
+			.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal) };
+		_vertexBufferMemory = vk::raii::DeviceMemory( _logicalDevice.handle(), memoryAllocateInfo );
 
-		_vertexBufferMemory = vk::raii::DeviceMemory(_logicalDevice.handle(), memoryAllocateInfo);
-		_vertexBuffer.bindMemory(*_vertexBufferMemory,0);
+		_vertexBuffer.bindMemory( *_vertexBufferMemory, 0 );
 
-		void* data = _vertexBufferMemory.mapMemory(0, bufferInfo.size);
-		memcpy(data, vertices.data(), bufferInfo.size);
-		_vertexBufferMemory.unmapMemory();
+		copyBuffer(stagingBuffer, _vertexBuffer, stagingInfo.size);
+	}
+
+	void VkCore::createIndexBuffer() {
+		vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+		vk::raii::Buffer stagingBuffer({});
+		vk::raii::DeviceMemory stagingBufferMemory({});
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+		void* data = stagingBufferMemory.mapMemory(0, bufferSize);
+		memcpy(data, indices.data(), (size_t) bufferSize);
+		stagingBufferMemory.unmapMemory();
+
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, _indexBuffer, _indexBufferMemory);
+
+		copyBuffer(stagingBuffer, _indexBuffer, bufferSize);
 	}
 
 	void VkCore::createCommandPool() {
@@ -388,7 +455,8 @@ constexpr bool enableValidationLayers = true;
 		_commandBuffers[_frameIndex].setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(_swapChain.extent().width), static_cast<float>(_swapChain.extent().height), 0.0f, 1.0f));
 		_commandBuffers[_frameIndex].setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), _swapChain.extent()));
 		_commandBuffers[_frameIndex].bindVertexBuffers(0, *_vertexBuffer, {0});
-		_commandBuffers[_frameIndex].draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+		_commandBuffers[_frameIndex].bindIndexBuffer(*_indexBuffer, 0, vk::IndexType::eUint16);
+		_commandBuffers[_frameIndex].drawIndexed(indices.size(), 1, 0, 0, 0);
 		_commandBuffers[_frameIndex].endRendering();
 
 		// After rendering, transition the swapchain image to vk::ImageLayout::ePresentSrcKHR
