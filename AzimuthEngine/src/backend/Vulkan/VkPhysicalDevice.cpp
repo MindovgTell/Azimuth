@@ -1,4 +1,4 @@
-#include "AzmVkPhysDevice.hpp"
+#include "VkPhysicalDevice.hpp"
 #include "log/log.hpp"
 
 namespace azm::backend
@@ -85,8 +85,10 @@ namespace azm::backend
 			vk::PhysicalDeviceVulkan13Features,
 			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
 								 
-		bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
+		bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy &&
+										features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
 										features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+										features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
 										features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
 		//Return true if the physicalDevice meets all the criteria
 		return supportsVulkan1_3 && 

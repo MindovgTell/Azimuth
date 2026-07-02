@@ -1,6 +1,6 @@
-#include "AzmVkSwapChain.hpp"
-#include "AzmVkPhysDevice.hpp"
-#include "AzmVkLogicalDevice.hpp"
+#include "VkSwapChain.hpp"
+#include "VkPhysicalDevice.hpp"
+#include "VkDevice.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -11,7 +11,7 @@ namespace azm::backend
 {
 
     void VulkanSwapChain::create(VulkanPhysicalDevice const& physicalDevice,
-                    VulkanLogicalDevice const& logicalDevice,
+                    VulkanDevice const& logicalDevice,
                     vk::raii::SurfaceKHR const& surface,
                     GLFWwindow* window)
     {
@@ -58,6 +58,7 @@ namespace azm::backend
 
 		_swapChain 		= vk::raii::SwapchainKHR(logicalDevice.handle(), swapChainCreateInfo);
 		_images = _swapChain.getImages(); 
+		createImageViews(logicalDevice);
 	}
 
 	uint32_t VulkanSwapChain::chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const &surfaceCapabilities) {
@@ -100,5 +101,21 @@ namespace azm::backend
 			std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
 		};
 	}
+
+	// Not sure about input parameter
+	void VulkanSwapChain::createImageViews(VulkanDevice const & device) {
+		assert(_imageViews.empty());
+
+		_imageViews.clear();
+		_imageViews.reserve(_images.size());
+
+		for ( auto &image: _images)
+		{
+			_imageViews.emplace_back(
+				device.createImageView(
+					image, _surfaceFormat.format, vk::ImageAspectFlagBits::eColor));
+		}
+	}
+
 
 }

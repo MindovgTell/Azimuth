@@ -1,11 +1,11 @@
-#include "AzmVkLogicalDevice.hpp"
-#include "AzmVkPhysDevice.hpp"
+#include "VkDevice.hpp"
+#include "VkPhysicalDevice.hpp"
 
 #include <stdexcept>
 
 namespace azm::backend
 {
-    void VulkanLogicalDevice::create(VulkanPhysicalDevice const& physicalDevice)
+    void VulkanDevice::create(VulkanPhysicalDevice const& physicalDevice)
     {
 
         if (physicalDevice.handle() == nullptr)
@@ -19,7 +19,7 @@ namespace azm::backend
 			vk::PhysicalDeviceVulkan11Features,
 			vk::PhysicalDeviceVulkan13Features,
 			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-			{},
+			{.features = {.samplerAnisotropy = true } },
 			{.shaderDrawParameters = true},
 			{
 				.dynamicRendering = true,

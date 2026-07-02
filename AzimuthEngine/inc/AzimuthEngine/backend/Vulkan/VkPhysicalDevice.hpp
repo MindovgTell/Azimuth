@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <vector>
 #include <optional>
+#include <stdexcept>
 
 namespace azm::backend
 {
@@ -91,4 +92,19 @@ namespace azm::backend
         QueueLookup findQueues(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::SurfaceKHR const& surface) const;
         void buildCapabilities(vk::raii::PhysicalDevice const& physicalDevice, vk::raii::SurfaceKHR const& surface);
     };
+
+
+inline uint32_t findMemoryType(VulkanPhysicalDevice const& device, uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+{
+    vk::PhysicalDeviceMemoryProperties memProperties = device.handle().getMemoryProperties();
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
 }

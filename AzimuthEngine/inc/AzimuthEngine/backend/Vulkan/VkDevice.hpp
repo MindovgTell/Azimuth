@@ -10,15 +10,14 @@ namespace azm::backend
 class VulkanPhysicalDevice;
 
 // TODO: in future logical device class should work with bigger number of queues
-class VulkanLogicalDevice
+class VulkanDevice
 {
 private:
     vk::raii::Device _device = nullptr;
     vk::raii::Queue  _queue  = nullptr;
 public:
-    VulkanLogicalDevice() = default;
-    ~VulkanLogicalDevice() = default;
-
+    VulkanDevice() = default;
+    ~VulkanDevice() = default;
 
     void create(VulkanPhysicalDevice const& physicalDevice);
 
@@ -31,6 +30,18 @@ public:
     {
         return _queue;
     }
+
+    
+    vk::raii::ImageView createImageView(vk::Image const &image, vk::Format format, vk::ImageAspectFlags aspectFlags) const
+	{
+		vk::ImageViewCreateInfo viewInfo{
+			.image            = image,
+			.viewType         = vk::ImageViewType::e2D,
+			.format           = format,
+			.subresourceRange = {aspectFlags, 0, 1, 0, 1}};
+		return vk::raii::ImageView(_device, viewInfo);
+	}
+
 };
 
 }

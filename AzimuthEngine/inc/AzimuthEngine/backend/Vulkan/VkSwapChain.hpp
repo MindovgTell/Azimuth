@@ -9,16 +9,22 @@
 namespace azm::backend
 {
     class VulkanPhysicalDevice;
-    class VulkanLogicalDevice;
+    class VulkanDevice;
 
     class VulkanSwapChain
     {
+    private:
+        vk::raii::SwapchainKHR _swapChain = nullptr;
+        std::vector<vk::Image> _images;
+        std::vector<vk::raii::ImageView> _imageViews;
+        vk::SurfaceFormatKHR _surfaceFormat{};
+        vk::Extent2D _extent{};
     public:
         VulkanSwapChain() = default;
         ~VulkanSwapChain() = default;
 
         void create(VulkanPhysicalDevice const& physicalDevice,
-                    VulkanLogicalDevice const& logicalDevice,
+                    VulkanDevice const& logicalDevice,
                     vk::raii::SurfaceKHR const& surface,
                     GLFWwindow* window);
 
@@ -43,16 +49,18 @@ namespace azm::backend
             return _extent;
         }
 
+        std::vector<vk::raii::ImageView> const& imageViews() {return _imageViews;}
+
+        void clear() {
+            _imageViews.clear();
+		    _swapChain = nullptr;
+        }
+
     private:
         static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities);
         static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats);
         static vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes);
         static vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities, GLFWwindow* window);
-
-    private:
-        vk::raii::SwapchainKHR _swapChain = nullptr;
-        std::vector<vk::Image> _images;
-        vk::SurfaceFormatKHR _surfaceFormat{};
-        vk::Extent2D _extent{};
+        void createImageViews(VulkanDevice const& device);
     };
 }

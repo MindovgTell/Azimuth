@@ -3,7 +3,7 @@
 #include <vector>
 #include <fstream>
 #include <string>
-#include <stdexcept>
+#include <stdexcept> 
 
 namespace azm
 {
@@ -34,5 +34,4 @@ namespace azm
         file.close();
         return buffer;
     }
-
 }

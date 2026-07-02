@@ -1,6 +1,9 @@
 .vscode
+.zed
 .DS_Store
 
 logs/
 Debug/
 build/
+/dependencies/
+/AzimuthEngine/assets/textures/texture.jpg

@@ -9,8 +9,8 @@ int main()
 
     azm::WindowSettings windowSettings{
         .title = "Azimuth",
-        .width = 800,
-        .height = 600,
+        .width = 1920,
+        .height = 1080,
         .x = 100,
         .y = 100
     };

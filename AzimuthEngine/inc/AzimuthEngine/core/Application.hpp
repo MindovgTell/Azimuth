@@ -2,7 +2,7 @@
 
 #include "window/IWindow.hpp"
 #include "window/IWindowManager.hpp"
-#include "AzmVkCore.hpp"
+#include "VkCore.hpp"
 
 #include <memory>
 
