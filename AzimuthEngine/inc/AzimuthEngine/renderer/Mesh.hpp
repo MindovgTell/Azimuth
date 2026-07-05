@@ -14,7 +14,7 @@
 #include <span>
 #include <vector>
 
-#include "VkBuffer.hpp" 
+#include "VkBuffer.hpp"
 
 namespace azm {
 
@@ -39,6 +39,13 @@ struct Vertex
     }
 };
 
+struct MeshData
+{
+    std::vector<Vertex> vertices;
+    std::vector<uint16_t> indices;
+};
+
+MeshData createCubeMesh();
 
 class Mesh {
 private:

@@ -20,7 +20,7 @@
 
 #include <chrono>
 
-namespace azm::backend 
+namespace azm::backend
 {
 
     DEFINE_LOG_CATEGORY_STATIC(ValidationLayerLog);
@@ -75,6 +75,16 @@ constexpr bool enableValidationLayers = true;
 		createSyncObjects();
     }
 
+	void VkCore::setObjectTransform(std::size_t index, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale)
+	{
+		if (index >= _objects.size())
+			return;
+
+		_objects[index].position = position;
+		_objects[index].rotation = rotation;
+		_objects[index].scale = scale;
+	}
+
     std::vector<const char*> VkCore::getRequiredInstanceExtensions() const {
 		uint32_t glfwExtensionCount = 0;
 		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -90,7 +100,7 @@ constexpr bool enableValidationLayers = true;
 #endif
 		return extensions;
 	}
-    
+
 
     void VkCore::createInstance(const char* pAppName)
     {
@@ -116,10 +126,10 @@ constexpr bool enableValidationLayers = true;
 		auto layerProperties = _context.enumerateInstanceLayerProperties();
 		auto unsupportedLayerIt = std::ranges::find_if(requiredLayers,
 													   [&layerProperties](auto const &requiredLayer) {
-															return std::ranges::none_of(layerProperties, 
+															return std::ranges::none_of(layerProperties,
 																						[requiredLayer](auto const &layerProperty){return strcmp(layerProperty.layerName, requiredLayer) == 0;});
 													    });
-        
+
         if (unsupportedLayerIt != requiredLayers.end()){
             //TODO: Add Logging info about layers and throw exception
             throw std::runtime_error("Required layer not supported: " + std::string(*unsupportedLayerIt));
@@ -137,7 +147,7 @@ constexpr bool enableValidationLayers = true;
 								                        });
         if(unsupportedPropertyIt != requiredExtensions.end()) {
             //TODO: Add Logging info about layers and throw exception
-            throw std::runtime_error("Required extension not supported: " + std::string(*unsupportedPropertyIt));            
+            throw std::runtime_error("Required extension not supported: " + std::string(*unsupportedPropertyIt));
         }
 
         vk::InstanceCreateInfo createInfo{
@@ -178,7 +188,7 @@ constexpr bool enableValidationLayers = true;
             .messageSeverity = severityFlags,
             .messageType 	  = messageTypeFlags,
             .pfnUserCallback = &debugCallback};
-        
+
         debugMessenger = _instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
     }
 
@@ -279,16 +289,16 @@ void VkCore::createDescriptorSets() {
 			{.binding = 1, .descriptorType = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eFragment}}
 		};
 		vk::DescriptorSetLayoutCreateInfo layoutInfo{
-			.bindingCount = static_cast<uint32_t>(bindings.size()), 
+			.bindingCount = static_cast<uint32_t>(bindings.size()),
 			.pBindings = bindings.data()};
 		_descriptorSetLayout = vk::raii::DescriptorSetLayout(_logicalDevice.handle(), layoutInfo);
 	}
 
 	void VkCore::createCommandBuffers() {
-		vk::CommandBufferAllocateInfo allocInfo{ 
-			.commandPool = _commandPool, 
-			.level = vk::CommandBufferLevel::ePrimary, 
-			.commandBufferCount = MAX_FRAMES_IN_FLIGHT 
+		vk::CommandBufferAllocateInfo allocInfo{
+			.commandPool = _commandPool,
+			.level = vk::CommandBufferLevel::ePrimary,
+			.commandBufferCount = MAX_FRAMES_IN_FLIGHT
 		};
 
 		_commandBuffers = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo));
@@ -309,16 +319,16 @@ void VkCore::createDescriptorSets() {
 	}
 
 	std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> VkCore::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
-		vk::BufferCreateInfo bufferInfo{ 
-			.size = size, 
-			.usage = usage, 
-			.sharingMode = vk::SharingMode::eExclusive 
+		vk::BufferCreateInfo bufferInfo{
+			.size = size,
+			.usage = usage,
+			.sharingMode = vk::SharingMode::eExclusive
 		};
 		vk::raii::Buffer buffer = vk::raii::Buffer(_logicalDevice.handle(), bufferInfo);
 		vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
-		vk::MemoryAllocateInfo allocInfo{ 
-			.allocationSize = memRequirements.size, 
-			.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties) 
+		vk::MemoryAllocateInfo allocInfo{
+			.allocationSize = memRequirements.size,
+			.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
 		};
 		vk::raii::DeviceMemory bufferMemory = vk::raii::DeviceMemory(_logicalDevice.handle(), allocInfo);
 		buffer.bindMemory(*bufferMemory, 0);
@@ -327,8 +337,8 @@ void VkCore::createDescriptorSets() {
 
 	vk::raii::CommandBuffer VkCore::beginSingleTimeCommands() {
 		vk::CommandBufferAllocateInfo allocInfo{
-			.commandPool = _commandPool, 
-			.level = vk::CommandBufferLevel::ePrimary, 
+			.commandPool = _commandPool,
+			.level = vk::CommandBufferLevel::ePrimary,
 			.commandBufferCount = 1
 		};
 		vk::raii::CommandBuffer commandBuffer = std::move(vk::raii::CommandBuffers(_logicalDevice.handle(), allocInfo).front());
@@ -363,7 +373,7 @@ void VkCore::createDescriptorSets() {
 
 	void VkCore::createTextureImage() {
 		int texWidth, texHeight, texChannels;
-		stbi_uc *pixels = stbi_load("AzimuthEngine/assets/textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		stbi_uc *pixels = stbi_load("AzimuthEngine/assets/textures/texture2.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 		vk::DeviceSize imageSize = texWidth * texHeight * 4;
 
 		if (!pixels)
@@ -380,15 +390,15 @@ void VkCore::createDescriptorSets() {
 		stbi_image_free(pixels);
 
 		std::tie(_textureImage, _textureImageMemory) = createImage(
-			texWidth, 
-			texHeight, 
+			texWidth,
+			texHeight,
 			vk::Format::eR8G8B8A8Srgb,
 			vk::ImageTiling::eOptimal,
 			vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-			vk::MemoryPropertyFlagBits::eDeviceLocal); 
+			vk::MemoryPropertyFlagBits::eDeviceLocal);
 			vk::raii::CommandBuffer commandBuffer = beginSingleTimeCommands();
 			transitionImageLayout(commandBuffer, _textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-			copyBufferToImage(commandBuffer, stagingBuffer, _textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));	
+			copyBufferToImage(commandBuffer, stagingBuffer, _textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
 			transitionImageLayout(commandBuffer, _textureImage, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 			endSingleTimeCommands(std::move(commandBuffer));
 	}
@@ -654,7 +664,7 @@ void VkCore::createDescriptorSets() {
 	void VkCore::createSyncObjects()
 	{
 		assert(_presentCompleteSemaphores.empty() && _renderFinishedSemaphores.empty() && _inFlightFences.empty());
-		
+
 		for (size_t i = 0; i < _swapChain.images().size(); i++)
 		{
 			_renderFinishedSemaphores.emplace_back(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
@@ -664,7 +674,7 @@ void VkCore::createDescriptorSets() {
 		{
 			_presentCompleteSemaphores.emplace_back(_logicalDevice.handle(), vk::SemaphoreCreateInfo());
 			_inFlightFences.emplace_back(_logicalDevice.handle(), vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
-		}	
+		}
 	}
 
 	void VkCore::drawFrame(GLFWwindow* window)
@@ -712,10 +722,10 @@ void VkCore::createDescriptorSets() {
 		_logicalDevice.queue().submit(submitInfo, *_inFlightFences[_frameIndex]);
 
 		const vk::PresentInfoKHR presentInfoKHR{
-			.waitSemaphoreCount = 1, 
-			.pWaitSemaphores = &*_renderFinishedSemaphores[imageIndex], 
-			.swapchainCount = 1, 
-			.pSwapchains = &*_swapChain.handle(), 
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = &*_renderFinishedSemaphores[imageIndex],
+			.swapchainCount = 1,
+			.pSwapchains = &*_swapChain.handle(),
 			.pImageIndices = &imageIndex
 		};
 		result = _logicalDevice.queue().presentKHR(presentInfoKHR);
@@ -723,7 +733,7 @@ void VkCore::createDescriptorSets() {
 		{
 			_framebufferResized = false;
 			recreateSwapChain(window);
-		}	
+		}
 		else
 		{
 		// There are no other success codes than eSuccess; on any error code, presentKHR already threw an exception.
@@ -757,9 +767,6 @@ void VkCore::createDescriptorSets() {
 
 		// Update uniform buffers for each object
 		for (auto& gameObject : _objects) {
-			// Apply continuous rotation to the object
-			gameObject.rotation.y += 0.01f; // Slow rotation around Y axis
-
 			// Get the model matrix for this object
 			glm::mat4 initialRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 			glm::mat4 model = gameObject.getModelMatrix() * initialRotation;

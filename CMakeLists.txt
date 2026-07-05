@@ -67,7 +67,7 @@ add_executable(VulkanEngine
  AzimuthEngine/src/backend/Vulkan/VkSwapChain.cpp
  AzimuthEngine/src/backend/Vulkan/VkGraphicsPipeline.cpp
  AzimuthEngine/src/backend/Vulkan/VkBuffer.cpp
- AzimuthEngine/src/backend/Vulkan/Mesh.cpp
+ AzimuthEngine/src/renderer/Mesh.cpp
 )
 
 add_slang_shader_target(VulkanEngine

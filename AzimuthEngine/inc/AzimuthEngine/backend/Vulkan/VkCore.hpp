@@ -9,12 +9,12 @@
 #include "VkPhysicalDevice.hpp"
 #include "VkSwapChain.hpp"
 #include "VkGraphicsPipeline.hpp"
-#include "Mesh.hpp"
+#include "renderer/Mesh.hpp"
 
 namespace azm::backend
 {
 
-    class VkCore 
+    class VkCore
     {
     private:
         // All necessary Vulkan context elements represented by classes
@@ -22,12 +22,12 @@ namespace azm::backend
         vk::raii::Context                     _context;
         vk::raii::Instance                    _instance = nullptr;
         vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
-        
+
         vk::raii::SurfaceKHR                  _surface  = nullptr;
         // Device setup
         VulkanPhysicalDevice                  _physicalDevice;
         VulkanDevice                          _logicalDevice;
-        // Swapchain setup 
+        // Swapchain setup
         VulkanSwapChain                       _swapChain;
         // Graphics pipeline
         VulkanGraphicsPipeline                _graphicsPipeline;
@@ -60,7 +60,7 @@ namespace azm::backend
 
 
 
-    public: 
+    public:
         VkCore()  = default;
         ~VkCore() = default;
         void init(
@@ -70,10 +70,11 @@ namespace azm::backend
             std::span<uint16_t const> indices,
             std::vector<Object>&& objects);
         void drawFrame(GLFWwindow* window);
+        void setObjectTransform(std::size_t index, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale);
         void notifyFramebufferResized();
         void waitIdle();
 
-    private: 
+    private:
         // Setup Vulkan Instance
         void createInstance(const char* pAppName);
         std::vector<const char*> getRequiredInstanceExtensions() const;
@@ -94,7 +95,7 @@ namespace azm::backend
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        
+
         void transition_image_layout(
             vk::Image               image,
             vk::ImageLayout         old_layout,
@@ -129,5 +130,5 @@ namespace azm::backend
         vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
         vk::Format findDepthFormat();
         bool hasStencilComponent(vk::Format format);
-    };    
+    };
 } // namespace azm
